@@ -1,0 +1,46 @@
+---
+# Ansible defaults file
+#
+# Promenne pro roli openldap
+
+openldap:
+  datadir_path: '/srv/database/ldap'
+  anonymous_bind: false
+  domain: 'example.com'
+  organization: 'example'
+  searchbase: 'dc=example,dc=com'
+  admin:
+    cn: 'admin'
+    dn: 'cn=admin,dc=example,dc=com'
+
+  backup:
+    enabled: true
+    dir: '/srv/database/ldap/backups'
+    schedule:
+      minute: 0
+    retention:
+      days: 1
+      min: 24
+
+  replication:
+    user:
+      create: true
+      dn: 'cn=replicator,dc=example,dc=com'
+      cn: 'replicator'
+    enabled: false
+    retry: '1 10 10 +'
+
+  tls:
+    enabled: false
+    ldaps: false
+    force: false
+    ca_file: '/etc/ssl/certs/ca-certificates.crt'
+    cert_file: '/etc/ssl/certs/ssl-cert-snakeoil.pem'
+    key_file: '/etc/ssl/private/ssl-cert-snakeoil.key'
+    priority_string: 'SECURE:-VERS-ALL:+VERS-TLS1.3:+VERS-TLS1.2:-RSA:-SHA1'
+
+
+# vychozi hodnota failover_role pro pripad, ze se nejedna o HA setup
+failover_role: 'none'
+
+...

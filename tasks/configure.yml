@@ -1,0 +1,112 @@
+---
+# Ansible role
+#
+# Konfigurace OpenLDAP
+
+- name: Konfigurace hash hesel
+  block:
+    - name: Nastavení podoby CRYPT formátu hesel
+      ldap_attr:
+        dn: 'cn=config'
+        name: 'olcPasswordCryptSaltFormat'
+        values: '$6$%.16s'
+        state: exact
+
+    - name: Nastavení CRYPT formátu hesel
+      ldap_attr:
+        dn: 'olcDatabase={-1}frontend,cn=config'
+        name: 'olcPasswordHash'
+        values: '{CRYPT}'
+        state: exact
+
+  tags:
+    - openldap-hash
+
+
+- name: Základní konfigurace
+  block:
+    - name: Konfigurace databáze
+      ldap_attr:
+        dn: 'olcDatabase={1}mdb,cn=config'
+        name: '{{ item.name }}'
+        values: '{{ item.value }}'
+        state: exact
+      loop:
+        - name: 'olcSuffix'
+          value: '{{ openldap.searchbase }}'
+        - name: 'olcDbDirectory'
+          value: '{{ openldap.datadir_path }}'
+        - name: 'olcRootDN'
+          value: '{{ openldap.admin.dn }}'
+        - name: 'olcRootPW'
+          value: "{CRYPT}{{ openldap.admin.password | password_hash('sha512', salt=(9999999999999999 | random(seed=openldap.admin.cn))) }}"
+
+    - name: Příprava LDIF pro databázi
+      template:
+        src: 'ldap-db.ldif.j2'
+        dest: '/etc/ldap/{{ openldap.organization }}/ldap-db.ldif'
+        force: false
+
+    - name: Vytvoření výchozí OpenLDAP databáze
+      shell: >
+        slapadd -l '/etc/ldap/{{ openldap.organization }}/ldap-db.ldif' &&
+        touch '{{ openldap.datadir_path }}/db_import_done'
+      args:
+        creates: "{{ openldap.datadir_path }}/db_import_done"
+
+  tags:
+    - openldap-basic
+
+
+- name: TLS konfigurace
+  import_tasks: 'configure_tls.yml'
+  when: openldap.tls.enabled
+  tags:
+    - openldap-tls
+
+
+- name: Anonymní bind
+  block:
+    - name: Zákaz anonymního bindu
+      ldap_attr:
+        dn: 'cn=config'
+        name: 'olcDisallows'
+        values: 'bind_anon'
+        state: "{{ 'exact' if not openldap.anonymous_bind else 'absent' }}"
+      notify: Restart slapd
+
+    - name: Vyžádání autentizace k databázi
+      ldap_attr:
+        dn: 'olcDatabase={1}mdb,cn=config'
+        name: 'olcRequires'
+        values: 'authc'
+        state: "{{ 'exact' if not openldap.anonymous_bind else 'absent' }}"
+      notify: Restart slapd
+
+  tags:
+    - openldap-bind
+
+
+- name: Nastavení ACL
+  ldap_attr:
+    dn: 'olcDatabase={1}mdb,cn=config'
+    name: 'olcAccess'
+    values: '{{ openldap_acl }}'
+    state: exact
+  when: openldap_acl is defined
+  tags:
+    - openldap-acl
+
+- name: Nastavení indexů
+  ldap_attr:
+    dn: 'olcDatabase={1}mdb,cn=config'
+    name: 'olcDbIndex'
+    values: '{{ item }}'
+    state: present
+  loop: '{{ openldap.indices | default([]) }}'
+  tags:
+    - openldap-index
+
+- meta: flush_handlers
+
+...

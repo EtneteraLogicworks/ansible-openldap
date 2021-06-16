@@ -1,0 +1,35 @@
+---
+# Ansible role
+#
+# Role pro OpenLDAP
+
+- name: Instalace OpenLDAP
+  import_tasks: 'install.yml'
+  tags:
+    - openldap-install
+
+- name: Konfigurace OpenLDAP
+  import_tasks: 'configure.yml'
+  tags:
+    - openldap-configure
+
+- name: Nastavení replikace
+  include_tasks: 'replication.yml'
+  when: openldap.replication.enabled
+  tags:
+    - openldap-replication
+
+- name: Vytvoření základní kostry databáze
+  include_tasks: 'populate.yml'
+  when: failover_role != 'backup'
+  tags:
+    - openldap-usergroups
+    - openldap-data
+
+- name: Nastavení backupu
+  include_tasks: 'backup.yml'
+  when: openldap.backup.enabled
+  tags:
+    - openldap-backup
+
+...

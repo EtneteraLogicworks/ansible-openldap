@@ -1,0 +1,32 @@
+---
+# Ansible role
+#
+# Instalace OpenLDAP
+
+- name: Instalace OpenLDAP balíků
+  apt:
+    name:
+      - 'slapd'
+      - 'ldap-utils'
+      - 'python-ldap'
+      - 'python3-ldap'
+
+- name: Přidání openldap uživele do skupin
+  user:
+    name: 'openldap'
+    groups: '{{ openldap.groups }}'
+    append: true
+  when: openldap.groups is defined
+
+- name: Vytvoření adresářů pro OpenLDAP
+  file:
+    path: '{{ item }}'
+    state: directory
+    owner: 'openldap'
+    group: 'openldap'
+    mode: '0700'
+  loop:
+    - '{{ openldap.datadir_path }}'
+    - '/etc/ldap/{{ openldap.organization }}'
+
+...

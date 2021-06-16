@@ -1,0 +1,84 @@
+---
+# Ansible role
+#
+# Konfigurace OpenLDAP replikace
+
+- name: Konfigurace OpenLDAP replikace
+  block:
+    - name: Vytvoření uživatele pro replikaci
+      ldap_entry:
+        dn: '{{ openldap.replication.user.dn }}'
+        objectClass:
+          - 'simpleSecurityObject'
+          - 'organizationalRole'
+        attributes:
+          cn: '{{ openldap.replication.user.cn }}'
+          description: 'User for LDAP HA replication'
+          userPassword: ''
+        bind_dn: '{{ openldap.admin.dn }}'
+        bind_pw: '{{ openldap.admin.password }}'
+        start_tls: "{{ 'yes' if openldap.tls.enabled else omit }}"
+      when: openldap.replication.user.create
+
+    - name: Nastaví heslo uživateli pro replikaci
+      ldap_passwd:
+        dn: '{{ openldap.replication.user.dn }}'
+        passwd: '{{ openldap.replication.user.password }}'
+        bind_dn: '{{ openldap.admin.dn }}'
+        bind_pw: '{{ openldap.admin.password }}'
+        start_tls: "{{ 'yes' if openldap.tls.enabled else omit }}"
+      when: openldap.replication.user.create
+
+    - name: Nastavení olcServerID
+      ldap_attr:
+        dn: 'cn=config'
+        name: 'olcServerID'
+        values: '{{ openldap.replication.server_id }}'
+        state: exact
+
+    - name: Načtení modulu syncprov
+      ldap_attr:
+        dn: 'cn=module{0},cn=config'
+        name: 'olcModuleLoad'
+        state: present
+        values:
+          - '{0}back_mdb'
+          - '{1}syncprov'
+
+    - name: Zapnutí syncprov olcOverlay
+      ldap_entry:
+        dn: 'olcOverlay={0}syncprov,olcDatabase={1}mdb,cn=config'
+        objectClass:
+          - 'olcOverlayConfig'
+          - 'olcSyncProvConfig'
+        attributes:
+          olcOverlay: 'syncprov'
+
+    - name: Nastavení olcSyncrepl
+      ldap_attr:
+        dn: 'olcDatabase={1}mdb,cn=config'
+        name: 'olcSyncrepl'
+        values: >-
+          {0}rid=001
+          provider=ldap://{{ failover_mirror }}
+          starttls={{ "critical" if openldap.tls.force else "yes" }}
+          searchbase="{{ openldap.searchbase }}"
+          binddn="{{ openldap.replication.user.dn }}"
+          credentials="{{ openldap.replication.user.password }}"
+          retry="{{ openldap.replication.retry }}"
+          schemachecking=on
+          interval=00:00:01:00
+          type=refreshAndPersist
+        state: exact
+
+    - name: Nastavení olcMirrorMode
+      ldap_attr:
+        dn: 'olcDatabase={1}mdb,cn=config'
+        name: 'olcMirrorMode'
+        values: 'TRUE'
+        state: exact
+
+  tags:
+    - openldap-replication
+
+...

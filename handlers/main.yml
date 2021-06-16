@@ -1,0 +1,9 @@
+---
+# Ansible handlers
+
+- name: Restart slapd
+  service:
+    name: 'slapd'
+    state: restarted
+
+...

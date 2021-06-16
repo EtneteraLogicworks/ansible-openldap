@@ -1,0 +1,27 @@
+dn: {{ openldap.searchbase }}
+objectClass: top
+objectClass: dcObject
+objectClass: organization
+o: {{ openldap.domain }}
+dc: {{ openldap.organization }}
+structuralObjectClass: organization
+entryUUID: {{ 9999999999999999999999 | random | to_uuid }}
+creatorsName: {{ openldap.admin.dn }}
+createTimestamp: {{ lookup('pipe', 'date +%Y%m%d%H%M%SZ') }}
+entryCSN: {{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}.748554Z#000000#000#000000
+modifiersName: {{ openldap.admin.dn }}
+modifyTimestamp: {{ lookup('pipe', 'date +%Y%m%d%H%M%SZ') }}
+
+dn: {{ openldap.admin.dn }}
+objectClass: simpleSecurityObject
+objectClass: organizationalRole
+cn: {{ openldap.admin.cn }}
+description: LDAP administrator
+userPassword:: {{ ('{CRYPT}' + (openldap.admin.password | password_hash('sha512'))) | b64encode }}
+structuralObjectClass: organizationalRole
+entryUUID: {{ 9999999999999999999999 | random | to_uuid }}
+creatorsName: {{ openldap.admin.dn }}
+createTimestamp: {{ lookup('pipe', 'date +%Y%m%d%H%M%SZ') }}
+entryCSN: {{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}.749628Z#000000#000#000000
+modifiersName: {{ openldap.admin.dn }}
+modifyTimestamp: {{ lookup('pipe', 'date +%Y%m%d%H%M%SZ') }}

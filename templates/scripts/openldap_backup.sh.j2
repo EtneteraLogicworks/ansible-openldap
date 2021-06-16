@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Script for backing up OpenLDAP server using slapcat
+
+readonly BACKUP_DIR='{{ openldap.backup.dir }}'
+readonly TIMESTAMP=$(date '+%F-%H-%M')
+
+function backup_ldap() {
+    local backup_file="${BACKUP_DIR}/openldap-${TIMESTAMP}.ldif.gz"
+    slapcat | gzip -9 > "${backup_file}"
+    ln -fs "$(basename "${backup_file}")" "${BACKUP_DIR}/latest"
+}
+
+backup_ldap

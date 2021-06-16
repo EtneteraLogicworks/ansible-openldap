@@ -1,0 +1,136 @@
+---
+# Ansible role
+#
+# Populace OpenLDAP databáze
+
+- name: Vytvoření skupin uživatelů
+  block:
+    - name: Vytvoření OU objektů
+      ldap_entry:
+        dn: 'ou={{ item }},{{ openldap.searchbase }}'
+        objectClass: 'organizationalUnit'
+        attributes:
+          description: 'OU for basic {{ item }}'
+          ou: '{{ item }}'
+        bind_dn: '{{ openldap.admin.dn }}'
+        bind_pw: '{{ openldap.admin.password }}'
+        start_tls: "{{ 'yes' if openldap.tls.enabled else omit }}"
+      loop:
+        - 'users'
+        - 'groups'
+
+    - name: Vytvoření základních uživatelů
+      ldap_entry:
+        dn: 'cn={{ item.name }},ou=users,{{ openldap.searchbase }}'
+        objectClass:
+          - 'organizationalRole'
+          - 'simpleSecurityObject'
+        attributes:
+          description: "{{ item.description | default('Basic user') }}"
+          cn: '{{ item.name }}'
+          userPassword: ''
+        bind_dn: '{{ openldap.admin.dn }}'
+        bind_pw: '{{ openldap.admin.password }}'
+        start_tls: "{{ 'yes' if openldap.tls.enabled else omit }}"
+      loop: '{{ openldap_data.usergroups.users | default([]) }}'
+
+    - name: Nastavení hesel základních uživatelů
+      ldap_passwd:
+        dn: 'cn={{ item.name }},ou=users,{{ openldap.searchbase }}'
+        passwd: '{{ item.password }}'
+        bind_dn: '{{ openldap.admin.dn }}'
+        bind_pw: '{{ openldap.admin.password }}'
+        start_tls: "{{ 'yes' if openldap.tls.enabled else omit }}"
+      loop: '{{ openldap_data.usergroups.users | default([]) }}'
+
+    - name: Vytvoření základních skupin
+      ldap_entry:
+        dn: 'cn={{ item.name }},ou=groups,{{ openldap.searchbase }}'
+        objectClass: 'groupOfNames'
+        attributes:
+          description: "{{ item.description | default('Basic group') }}"
+          member: ''
+          cn: '{{ item.name }}'
+        bind_dn: '{{ openldap.admin.dn }}'
+        bind_pw: '{{ openldap.admin.password }}'
+        start_tls: "{{ 'yes' if openldap.tls.enabled else omit }}"
+      loop: '{{ openldap_data.usergroups.groups | default([]) }}'
+
+    - name: Nastavení členství v základních skupinách
+      ldap_attr:
+        dn: 'cn={{ item.name }},ou=groups,{{ openldap.searchbase }}'
+        name: 'member'
+        # Converts list of CNs to list of DNs
+        values: '{{ item.members | map("regex_replace", "^(.*)$", "cn=\1,ou=users," + openldap.searchbase) | list }}'
+        state: 'exact'
+        bind_dn: '{{ openldap.admin.dn }}'
+        bind_pw: '{{ openldap.admin.password }}'
+        start_tls: "{{ 'yes' if openldap.tls.enabled else omit }}"
+      when: item.members | length > 0
+      loop: '{{ openldap_data.usergroups.groups | default([]) }}'
+
+    - name: Nastavení prázdné skupiny
+      ldap_attr:
+        dn: 'cn={{ item.name }},ou=groups,{{ openldap.searchbase }}'
+        name: 'member'
+        values: ''
+        state: 'exact'
+        bind_dn: '{{ openldap.admin.dn }}'
+        bind_pw: '{{ openldap.admin.password }}'
+        start_tls: "{{ 'yes' if openldap.tls.enabled else omit }}"
+      when: item.members | length == 0
+      loop: '{{ openldap_data.usergroups.groups | default([]) }}'
+
+  when: openldap_data.usergroups is defined
+  tags:
+    - openldap-usergroups
+
+
+- name: Vytvoření generického obsahu
+  block:
+    - name: Vytvoření generických objektů
+      ldap_entry:
+        dn: '{{ item.dn }}'
+        objectClass: '{{ item.objectClass }}'
+        attributes: '{{ item.attributes | default(omit) }}'
+        bind_dn: '{{ openldap.admin.dn }}'
+        bind_pw: '{{ openldap.admin.password }}'
+        start_tls: "{{ 'yes' if openldap.tls.enabled else omit }}"
+      loop: '{{ openldap_data.objects | default([]) }}'
+
+    - name: Vytvoření generických uživatelů
+      ldap_entry:
+        dn: '{{ item.dn }}'
+        objectClass:
+            - 'organizationalRole'
+            - 'simpleSecurityObject'
+        attributes: '{{ item.attributes | default(omit) }}'
+        bind_dn: '{{ openldap.admin.dn }}'
+        bind_pw: '{{ openldap.admin.password }}'
+        start_tls: "{{ 'yes' if openldap.tls.enabled else omit }}"
+      loop: '{{ openldap_data.users | default([]) }}'
+
+    - name: Nastavení hesel generických uživatelů
+      ldap_passwd:
+        dn: '{{ item.dn }}'
+        passwd: '{{ item.password }}'
+        bind_dn: '{{ openldap.admin.dn }}'
+        bind_pw: '{{ openldap.admin.password }}'
+        start_tls: "{{ 'yes' if openldap.tls.enabled else omit }}"
+      loop: '{{ openldap_data.users | default([]) }}'
+
+    - name: Nastavení atributů
+      ldap_attr:
+        dn: '{{ item.dn }}'
+        name: '{{ item.attribute }}'
+        values: '{{ item.value }}'
+        state: "{{ item.state | default('present') }}"
+        bind_dn: '{{ openldap.admin.dn }}'
+        bind_pw: '{{ openldap.admin.password }}'
+        start_tls: "{{ 'yes' if openldap.tls.enabled else omit }}"
+      loop: '{{ openldap_data.attributes | default([]) }}'
+
+  tags:
+    - openldap-data
+
+...

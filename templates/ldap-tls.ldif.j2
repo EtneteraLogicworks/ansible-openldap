@@ -1,0 +1,13 @@
+# Konfigurace TLS OpenLDAP
+# Nelze použít Ansible modul, protože je třeba vše nastavit najednou
+dn: cn=config
+changetype: modify
+replace: olcTLSCACertificateFile
+olcTLSCACertificateFile: {{ openldap.tls.ca_file }}
+-
+replace: olcTLSCertificateFile
+olcTLSCertificateFile: {{ openldap.tls.cert_file }}
+-
+replace: olcTLSCertificateKeyFile
+olcTLSCertificateKeyFile: {{ openldap.tls.key_file }}
+

@@ -1,0 +1,47 @@
+---
+# Ansible task
+#
+# Nastavení pravidelného slapcat dump OpenLDAPu
+
+- name: Nastavení zálohy OpenLDAP databáze
+  block:
+    - name: Instalace zálohovacího skriptu
+      template:
+        src: 'scripts/openldap_backup.sh.j2'
+        dest: '/opt/scripts/openldap_backup.sh'
+        mode: '0755'
+
+    - name: Nastavení spouštění skriptu cronem
+      cron:
+        job: >-
+          /opt/scripts/openldap_backup.sh
+        user: 'root'
+        cron_file: 'openldap'
+        name: 'OpenLDAP backup'
+        minute: '{{ openldap.backup.schedule.minute | default(omit) }}'
+        hour: '{{ openldap.backup.schedule.hour | default(omit) }}'
+        day: '{{ openldap.backup.schedule.day | default(omit) }}'
+        dow: '{{ openldap.backup.schedule.weekday | default(omit) }}'
+        month: '{{ openldap.backup.schedule.month | default(omit) }}'
+
+    - name: Nastaví PATH pro cron
+      cronvar:
+        name: 'PATH'
+        value: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+        cron_file: 'openldap'
+
+    - import_tasks: 'includes/remove_backups/main.yml'
+      vars:
+        zaloha:
+          name: 'openldap'
+          dir: '{{ openldap.backup.dir }}'
+          days: '{{ openldap.backup.retention.days }}'
+          min: '{{ openldap.backup.retention.min }}'
+          user: 'root'
+          mode: '0700'
+          type: 'file'
+
+  tags:
+    - openldap-backup
+
+...
